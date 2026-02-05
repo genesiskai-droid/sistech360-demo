@@ -1,0 +1,13 @@
+// TECHNOVA 360 Backend - Workflows Module (DEMO/SANDBOX)
+// ============================================================
+
+import { Module } from '@nestjs/common';
+import { WorkflowsService } from './workflows.service';
+import { WorkflowsController } from './workflows.controller';
+
+@Module({
+  providers: [WorkflowsService],
+  controllers: [WorkflowsController],
+  exports: [WorkflowsService],
+})
+export class WorkflowsModule {}

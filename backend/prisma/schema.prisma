@@ -1,0 +1,440 @@
+// TECHNOVA 360 Backend - Prisma Schema (DEMO/SANDBOX)
+// ============================================================
+// WARNING: This is a DEMO database schema for testing purposes
+// All data is fictional and for demonstration only
+// ============================================================
+//
+// PRISMA 5.x CONFIGURATION (CURRENTLY STABLE):
+// The datasource URL is configured in this file using env("DATABASE_URL")
+// This project uses Prisma 5.22.0 (stable version)
+// The `url` property is fully supported in Prisma 5.x
+// ============================================================
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Role {
+    ADMIN
+    MANAGER
+    TECHNICIAN
+    CLIENT
+}
+
+enum BookingStatus {
+    PENDING
+    CONFIRMED
+    IN_PROGRESS
+    COMPLETED
+    CANCELLED
+    REFUNDED
+}
+
+enum PaymentStatus {
+    PENDING
+    PAID
+    FAILED
+    REFUNDED
+}
+
+enum WorkflowStepStatus {
+    PENDING
+    IN_PROGRESS
+    COMPLETED
+    BLOCKED
+}
+
+enum SOSPriority {
+    LOW
+    MEDIUM
+    HIGH
+    CRITICAL
+}
+
+enum SOSStatus {
+    RECEIVED
+    ASSIGNED
+    IN_PROGRESS
+    RESOLVED
+    CLOSED
+}
+
+enum ServiceType {
+    INSTALLATION
+    REPAIR
+    MAINTENANCE
+    CONSULTATION
+    EMERGENCY
+}
+
+// ============================================================
+// USER & AUTH MODELS
+// ============================================================
+
+model User {
+    id            String    @id @default(uuid())
+    email         String    @unique
+    password      String? // Nullable for Supabase Auth users
+    role          Role      @default(CLIENT)
+    isActive      Boolean   @default(true)
+    emailVerified Boolean   @default(false)
+    supabaseId    String?   @unique // Link to Supabase Auth
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+    deletedAt     DateTime? // Soft delete
+
+    // Profile relations
+    clientProfile     ClientProfile?
+    technicianProfile TechnicianProfile?
+
+    // Relations
+    auditLogs   AuditLog[]
+    payments    Payment[]
+    sosRequests SOSRequest[]
+
+    @@index([email])
+    @@index([role])
+    @@index([supabaseId])
+}
+
+model ClientProfile {
+    id     String @id @default(uuid())
+    userId String @unique
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    firstName  String
+    lastName   String
+    phone      String?
+    company    String?
+    address    String?
+    city       String?
+    country    String?
+    postalCode String?
+    taxId      String? // RUC/DNI
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Relations
+    bookings Booking[]
+
+    @@index([userId])
+}
+
+model TechnicianProfile {
+    id     String @id @default(uuid())
+    userId String @unique
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    firstName       String
+    lastName        String
+    phone           String?
+    employeeId      String?  @unique
+    specialization  String?
+    certification   String?
+    yearsExperience Int?
+    hourlyRate      Decimal? @db.Decimal(10, 2)
+    isAvailable     Boolean  @default(true)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Relations
+    bookings         Booking[]
+    workflowSteps    WorkflowStep[]
+    technicalReports TechnicalReport[]
+
+    @@index([userId])
+    @@index([specialization])
+}
+
+// ============================================================
+// SERVICE & BOOKING MODELS
+// ============================================================
+
+model Service {
+    id              String      @id @default(uuid())
+    name            String
+    description     String
+    type            ServiceType
+    basePrice       Decimal     @db.Decimal(10, 2)
+    durationMinutes Int         @default(60)
+    isActive        Boolean     @default(true)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Relations
+    bookings      Booking[]
+    workflowSteps WorkflowStep[]
+
+    @@index([type])
+    @@index([isActive])
+}
+
+model Booking {
+    id            String        @id @default(uuid())
+    bookingNumber String        @unique @default(uuid())
+    clientId      String
+    client        ClientProfile @relation(fields: [clientId], references: [id])
+
+    serviceId String
+    service   Service @relation(fields: [serviceId], references: [id])
+
+    technicianId String?
+    technician   TechnicianProfile? @relation(fields: [technicianId], references: [id])
+
+    scheduledDate   DateTime
+    durationMinutes Int           @default(60)
+    status          BookingStatus @default(PENDING)
+
+    address String?
+    city    String?
+    notes   String?
+
+    totalAmount    Decimal  @db.Decimal(10, 2)
+    discountAmount Decimal? @db.Decimal(10, 2)
+    finalAmount    Decimal  @db.Decimal(10, 2)
+
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+    completedAt DateTime?
+
+    // Relations
+    payments         Payment[]
+    workflowSteps    WorkflowStep[]
+    technicalReports TechnicalReport[]
+    qualityControls  QualityControl[]
+
+    @@index([clientId])
+    @@index([technicianId])
+    @@index([serviceId])
+    @@index([status])
+    @@index([scheduledDate])
+    @@index([bookingNumber])
+}
+
+// ============================================================
+// WORKFLOW MODELS
+// ============================================================
+
+model WorkflowStep {
+    id        String  @id @default(uuid())
+    bookingId String
+    booking   Booking @relation(fields: [bookingId], references: [id])
+
+    serviceId String
+    service   Service @relation(fields: [serviceId], references: [id])
+
+    stepOrder       Int
+    stepName        String
+    stepDescription String?
+
+    technicianId String?
+    technician   TechnicianProfile? @relation(fields: [technicianId], references: [id])
+
+    status      WorkflowStepStatus @default(PENDING)
+    startedAt   DateTime?
+    completedAt DateTime?
+    notes       String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([bookingId, stepOrder])
+    @@index([bookingId])
+    @@index([technicianId])
+    @@index([status])
+}
+
+// ============================================================
+// TECHNICAL & QUALITY MODELS
+// ============================================================
+
+model TechnicalReport {
+    id        String  @id @default(uuid())
+    bookingId String
+    booking   Booking @relation(fields: [bookingId], references: [id])
+
+    technicianId String
+    technician   TechnicianProfile @relation(fields: [technicianId], references: [id])
+
+    reportNumber String @unique @default(uuid())
+
+    findings        String
+    workPerformed   String
+    partsUsed       String?
+    recommendations String?
+
+    startTime  DateTime
+    endTime    DateTime
+    laborHours Decimal  @db.Decimal(5, 2)
+
+    photos String[] // URLs to photos
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([bookingId])
+    @@index([technicianId])
+    @@index([reportNumber])
+}
+
+model QualityControl {
+    id        String  @id @default(uuid())
+    bookingId String
+    booking   Booking @relation(fields: [bookingId], references: [id])
+
+    inspectorName  String
+    inspectionDate DateTime
+
+    safetyCheck        Boolean
+    functionalityCheck Boolean
+    cleanlinessCheck   Boolean
+
+    overallRating Int // 1-5
+    passed        Boolean
+
+    findings         String?
+    followUpRequired Boolean @default(false)
+
+    createdAt DateTime @default(now())
+
+    @@index([bookingId])
+}
+
+// ============================================================
+// PAYMENT MODELS
+// ============================================================
+
+model Payment {
+    id        String  @id @default(uuid())
+    bookingId String
+    booking   Booking @relation(fields: [bookingId], references: [id])
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    stripePaymentId  String? @unique
+    stripeCustomerId String?
+
+    amount   Decimal       @db.Decimal(10, 2)
+    currency String        @default("usd")
+    status   PaymentStatus @default(PENDING)
+
+    paymentMethod   String?
+    paymentIntentId String? @unique
+
+    invoiceNumber String? @unique
+    invoiceUrl    String?
+
+    refundedAmount Decimal?  @db.Decimal(10, 2)
+    refundedAt     DateTime?
+
+    metadata Json?
+
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    paidAt    DateTime?
+
+    @@index([bookingId])
+    @@index([userId])
+    @@index([stripePaymentId])
+    @@index([status])
+    @@index([invoiceNumber])
+}
+
+model Invoice {
+    id            String @id @default(uuid())
+    invoiceNumber String @unique @default(uuid())
+
+    clientName    String
+    clientEmail   String
+    clientAddress String?
+    taxId         String?
+
+    items       Json // Array of line items
+    subtotal    Decimal @db.Decimal(10, 2)
+    taxAmount   Decimal @db.Decimal(10, 2)
+    totalAmount Decimal @db.Decimal(10, 2)
+
+    issueDate DateTime @default(now())
+    dueDate   DateTime
+
+    paid   Boolean   @default(false)
+    paidAt DateTime?
+
+    notes     String?
+    createdAt DateTime @default(now())
+
+    @@index([invoiceNumber])
+    @@index([clientEmail])
+}
+
+// ============================================================
+// SOS EMERGENCY MODEL
+// ============================================================
+
+model SOSRequest {
+    id        String @id @default(uuid())
+    sosNumber String @unique @default(uuid())
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    priority SOSPriority @default(MEDIUM)
+    status   SOSStatus   @default(RECEIVED)
+
+    issueType   String
+    description String
+    location    String?
+    phone       String?
+
+    assignedTo String?
+    resolvedAt DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([userId])
+    @@index([status])
+    @@index([priority])
+    @@index([sosNumber])
+}
+
+// ============================================================
+// AUDIT LOG MODEL
+// ============================================================
+
+model AuditLog {
+    id String @id @default(uuid())
+
+    userId String?
+    user   User?   @relation(fields: [userId], references: [id])
+
+    action     String
+    entityType String
+    entityId   String?
+
+    oldValues Json?
+    newValues Json?
+
+    ipAddress String?
+    userAgent String?
+
+    createdAt DateTime @default(now())
+
+    @@index([userId])
+    @@index([action])
+    @@index([entityType])
+    @@index([createdAt])
+}
