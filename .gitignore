@@ -1,4 +1,6 @@
+# =========================
 # Logs
+# =========================
 logs
 *.log
 npm-debug.log*
@@ -7,18 +9,52 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# =========================
+# Dependencies
+# =========================
 node_modules
+
+# =========================
+# Build outputs
+# =========================
 dist
 dist-ssr
-*.local
+build
+.out
+coverage
 
+# =========================
+# Environment variables (CRÍTICO)
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Local / OS files
+# =========================
+*.local
+.DS_Store
+
+# =========================
 # Editor directories and files
+# =========================
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# =========================
+# Prisma
+# =========================
+prisma/migrations/*
+!prisma/migrations/.gitkeep
+
+# =========================
+# Misc
+# =========================
+*.cache
