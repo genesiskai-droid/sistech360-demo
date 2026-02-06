@@ -7,6 +7,13 @@ import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import Stripe from 'stripe';
+import { Request as ExpressRequest } from 'express';
+
+interface AuthUser {
+  id: string;
+  email: string;
+  role: string;
+}
 
 @ApiTags('payments')
 @Controller('payments')
@@ -17,7 +24,7 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create Stripe payment intent for booking' })
-  createPaymentIntent(@Param('bookingId') bookingId: string, @Request() req) {
+  createPaymentIntent(@Param('bookingId') bookingId: string, @Request() req: ExpressRequest & { user: AuthUser }) {
     return this.paymentsService.createPaymentIntent(bookingId, req.user.id);
   }
 
@@ -36,7 +43,7 @@ export class PaymentsController {
       apiVersion: '2023-10-16',
     });
     const event = stripe.webhooks.constructEvent(
-      req.rawBody,
+      req.rawBody as Buffer,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET || 'whsec_demo',
     );

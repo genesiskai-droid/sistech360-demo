@@ -7,6 +7,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -30,7 +31,7 @@ export class AuthService {
       data: {
         email: createUserDto.email,
         password: hashedPassword,
-        role: createUserDto.role || 'CLIENT',
+        role: (createUserDto.role as Role) || Role.CLIENT,
         clientProfile: createUserDto.role === 'CLIENT' ? {
           create: {
             firstName: createUserDto.firstName,
@@ -119,7 +120,7 @@ export class AuthService {
           data: {
             email,
             supabaseId,
-            role: 'CLIENT',
+            role: Role.CLIENT,
             clientProfile: {
               create: {
                 firstName: email.split('@')[0],

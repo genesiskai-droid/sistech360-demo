@@ -1,12 +1,19 @@
 // TECHNOVA 360 Backend - Users Controller (DEMO/SANDBOX)
 // ============================================================
 
-import { Controller, Get, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Request as ExpressRequest } from 'express';
+
+interface AuthUser {
+  id: string;
+  email: string;
+  role: string;
+}
 
 @ApiTags('users')
 @Controller('users')
@@ -24,7 +31,7 @@ export class UsersController {
 
   @Get('profile')
   @ApiOperation({ summary: 'Get current user profile' })
-  getProfile(@Request() req) {
+  getProfile(@Request() req: ExpressRequest & { user: AuthUser }) {
     return this.usersService.findOne(req.user.id);
   }
 

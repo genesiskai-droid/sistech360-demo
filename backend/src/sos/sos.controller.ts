@@ -6,6 +6,13 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SosService } from './sos.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Request as ExpressRequest } from 'express';
+
+interface AuthUser {
+  id: string;
+  email: string;
+  role: string;
+}
 
 @ApiTags('sos')
 @Controller('sos')
@@ -16,7 +23,7 @@ export class SosController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create SOS request' })
-  create(@Body() data: any, @Request() req) {
+  create(@Body() data: any, @Request() req: ExpressRequest & { user: AuthUser }) {
     return this.sosService.create(data, req.user.id);
   }
 

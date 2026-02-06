@@ -6,6 +6,13 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Request as ExpressRequest } from 'express';
+
+interface AuthUser {
+  id: string;
+  email: string;
+  role: string;
+}
 
 @ApiTags('reports')
 @Controller('reports')
@@ -17,7 +24,7 @@ export class ReportsController {
   @Post()
   @Roles('TECHNICIAN', 'ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Create technical report' })
-  create(@Body() data: any, @Request() req) {
+  create(@Body() data: any, @Request() req: ExpressRequest & { user: AuthUser }) {
     return this.reportsService.create(data, req.user.id);
   }
 
